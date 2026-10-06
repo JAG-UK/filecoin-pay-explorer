@@ -31,6 +31,7 @@ export function getSubgraphUrl(network: Network): string {
   const urls = {
     mainnet: process.env.NEXT_PUBLIC_SUBGRAPH_URL_MAINNET,
     calibration: process.env.NEXT_PUBLIC_SUBGRAPH_URL_CALIBRATION,
+    devnet: process.env.NEXT_PUBLIC_SUBGRAPH_URL_DEVNET,
   };
 
   const url = urls[network];
