@@ -5,7 +5,17 @@
  * its fold/merge logic is unit-testable in isolation; this module owns the
  * network I/O and viem decoding.
  */
-import { type AbiEvent, decodeEventLog, encodeEventTopics, getAbiItem, type Hex, pad } from "viem";
+import {
+  type AbiEvent,
+  createPublicClient,
+  decodeEventLog,
+  encodeEventTopics,
+  getAbiItem,
+  type Hex,
+  http,
+  numberToHex,
+  pad,
+} from "viem";
 import { type Chain, getChain } from "@/constants/chains";
 import type { Network } from "@/types";
 import type { DecodedAuthorizationEvent } from "@/utils/sessionKeySync";
@@ -14,7 +24,11 @@ import type { DecodedAuthorizationEvent } from "@/utils/sessionKeySync";
 const REGISTRY_DEPLOY_BLOCK: Record<Network, bigint> = {
   mainnet: 5459604n,
   calibration: 3185523n,
+  devnet: 0n,
 };
+
+/** Lotus refuses an `eth_getLogs` range wider than this many epochs. */
+const LOTUS_MAX_LOG_RANGE = 2880n;
 
 /** Shape of one entry in Blockscout's Etherscan-compatible `getLogs` response. */
 export interface BlockscoutLogEntry {
@@ -62,6 +76,11 @@ export async function fetchAuthorizationEvents(
   const [topic0] = encodeEventTopics({ abi: [event], eventName: "AuthorizationsUpdated" });
   const topic1 = pad(account, { size: 32 }).toLowerCase();
 
+  if (network === "devnet") {
+    const rows = await fetchLogsFromLotus(network, registry, topic0, topic1);
+    return decodeAuthorizationLogs(rows, event, topic0, topic1, getChain(network).genesisTimestamp);
+  }
+
   const blockExplorerUrl = getChain(network).blockExplorers?.default?.url;
   if (!blockExplorerUrl) throw new Error(`${network} chain has no default block explorer configured`);
   const url = new URL("/api", blockExplorerUrl);
@@ -105,6 +124,44 @@ export async function fetchAuthorizationEvents(
   }
 
   return decodeAuthorizationLogs(rawLogs, event, topic0, topic1, getChain(network).genesisTimestamp);
+}
+
+/**
+ * A devnet has no Blockscout, so read the same logs from its Lotus directly,
+ * in ranges Lotus accepts, shaped as Blockscout rows so they decode the same way.
+ */
+async function fetchLogsFromLotus(
+  network: Network,
+  registry: Chain["contracts"]["sessionKeyRegistry"],
+  topic0: Hex,
+  topic1: string,
+): Promise<BlockscoutLogEntry[]> {
+  const client = createPublicClient({ chain: getChain(network), transport: http() });
+  const head = await client.getBlockNumber();
+  const logs: { data: Hex; topics: Hex[]; blockNumber: Hex; logIndex: Hex }[] = [];
+  for (let from = REGISTRY_DEPLOY_BLOCK[network]; from <= head; from += LOTUS_MAX_LOG_RANGE) {
+    const to = from + LOTUS_MAX_LOG_RANGE - 1n < head ? from + LOTUS_MAX_LOG_RANGE - 1n : head;
+    const page = await client.request({
+      method: "eth_getLogs",
+      params: [
+        {
+          address: registry.address,
+          topics: [topic0, topic1 as Hex],
+          fromBlock: numberToHex(from),
+          toBlock: numberToHex(to),
+        },
+      ],
+    });
+    logs.push(...(page as typeof logs));
+  }
+  const timestamps = new Map<Hex, string>();
+  for (const { blockNumber } of logs) {
+    if (!timestamps.has(blockNumber)) {
+      const block = await client.getBlock({ blockNumber: BigInt(blockNumber) });
+      timestamps.set(blockNumber, block.timestamp.toString());
+    }
+  }
+  return logs.map((log) => ({ ...log, timeStamp: timestamps.get(log.blockNumber) }));
 }
 
 /**

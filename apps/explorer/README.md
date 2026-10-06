@@ -64,6 +64,28 @@ pnpm build
 pnpm start
 ```
 
+## Against a local foc-devnet
+
+For developing against [foc-devnet](https://github.com/FilOzone/foc-devnet), the console
+can add a third network, `devnet`, for wallets on chain 31415926:
+
+```bash
+FOC_DEVNET=1 pnpm dev
+```
+
+It reads `~/.foc-devnet/state/latest/devnet-info.json` (or `DEVNET_INFO_PATH`) at
+startup, so restart it after restarting the devnet. Without the variable nothing
+changes, and a `network=devnet` link is refused as unknown.
+
+- The browser reaches Lotus through `/api/devnet-rpc`, a rewrite in `next.config.ts`,
+  because Lotus sends no CORS headers. No devnet private key reaches the client.
+- Session-key history is read from Lotus directly, since a devnet has no Blockscout.
+- A devnet has no subgraph, so the subgraph-backed pages (rails, funds, services)
+  show errors unless `NEXT_PUBLIC_SUBGRAPH_URL_DEVNET` points at one. The
+  session-keys page, including its `?authorize=…&network=devnet` pairing link,
+  works without it. The app still needs some value for the mainnet and
+  calibration subgraph variables to start.
+
 ## Available Scripts
 
 | Command       | Description                                            |

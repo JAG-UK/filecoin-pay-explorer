@@ -10,7 +10,8 @@ export type TransactionType =
   | "authorizeSessionKey"
   | "revokeSessionKey";
 
-export type Network = "calibration" | "mainnet";
+/** `devnet` exists only when the dev server runs against a local foc-devnet; see next.config.ts. */
+export type Network = "calibration" | "mainnet" | "devnet";
 
 export interface TransactionMetadata {
   type: TransactionType;

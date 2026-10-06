@@ -9,6 +9,7 @@
  *   and when nothing valid remains the param collapses to null (full-menu default).
  */
 import { getAddress, isAddress } from "viem";
+import type { Network } from "@/types";
 import { type ScopeId, SESSION_KEY_SCOPES } from "./sessionKeys";
 
 /**
@@ -84,10 +85,12 @@ export function presetScopeStates(
  * network is refused: the CLI always sends one, so its absence means a
  * malformed link, not a request the wallet's chain may satisfy.
  */
-export function parseNetworkParam(value: string | null | undefined): "mainnet" | "calibration" | null {
+export function parseNetworkParam(value: string | null | undefined): Network | null {
   if (typeof value !== "string") return null;
   const network = value.trim().toLowerCase();
-  return network === "mainnet" || network === "calibration" ? network : null;
+  if (network === "mainnet" || network === "calibration") return network;
+  // Only a dev server started against a local devnet knows one; anywhere else it is an unknown network.
+  return network === "devnet" && process.env.NEXT_PUBLIC_FOC_DEVNET_INFO ? network : null;
 }
 
 /**
@@ -111,7 +114,7 @@ export const LINK_PARAMS = ["authorize", "scopes", "network", "name", "days", "r
 
 export interface RevokeLink {
   address: `0x${string}`;
-  network: "mainnet" | "calibration";
+  network: Network;
 }
 
 /** `?revoke=&network=`, as `filecoin-pin logout` prints it. Same rules as the pairing link; network required. */

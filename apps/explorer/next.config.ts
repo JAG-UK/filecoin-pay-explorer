@@ -1,4 +1,25 @@
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { NextConfig } from "next";
+
+/**
+ * A local foc-devnet (github.com/FilOzone/foc-devnet), for development only:
+ * enabled by FOC_DEVNET=1 or DEVNET_INFO_PATH, never in a deployment. The
+ * client gets devnet-info.json without its `users`, so no devnet private key
+ * is bundled, and reaches Lotus through /api/devnet-rpc because Lotus sends no
+ * CORS headers (and same-origin keeps the CSP unchanged).
+ */
+function loadDevnetInfo() {
+  const path =
+    process.env.DEVNET_INFO_PATH ??
+    (process.env.FOC_DEVNET === "1" ? join(homedir(), ".foc-devnet", "state", "latest", "devnet-info.json") : null);
+  if (!path) return null;
+  const { version, info } = JSON.parse(readFileSync(path, "utf8"));
+  const { users: _privateKeys, ...publicInfo } = info;
+  return { version, info: publicInfo };
+}
+const devnetInfo = loadDevnetInfo();
 
 const svgrRule = {
   test: /\.svg$/,
@@ -46,6 +67,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.0.*"],
   headers: async () => [{ source: "/(.*)", headers: securityHeaders }],
+  env: devnetInfo ? { NEXT_PUBLIC_FOC_DEVNET_INFO: JSON.stringify(devnetInfo) } : {},
+  rewrites: async () =>
+    devnetInfo ? [{ source: "/api/devnet-rpc", destination: devnetInfo.info.lotus.host_rpc_url }] : [],
   images: {
     qualities: [75, 100],
   },

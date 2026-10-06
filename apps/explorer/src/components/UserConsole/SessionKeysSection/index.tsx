@@ -49,7 +49,7 @@ const STATUS_LABELS: Record<SessionKeyWithStatus["status"], string> = {
 };
 
 /** Filfox shows the verified source; the configured explorer (Blockscout) is the one the rest of the console links to. */
-const FILFOX_ADDRESS_URL: Record<Network, (address: string) => string> = {
+const FILFOX_ADDRESS_URL: Partial<Record<Network, (address: string) => string>> = {
   mainnet: (address) => `https://filfox.info/en/address/${address}?t=0`,
   calibration: (address) => `https://calibration.filfox.info/en/address/${address}?t=3`,
 };
@@ -88,7 +88,9 @@ const ConnectedSessionKeys = ({ network, account, revokeError, revokeAddress, re
     useSessionKeys(network, account);
   const explorerUrl = getChain(network).blockExplorers?.default.url;
   const registryLinks = [
-    { label: "Registry on Filfox (verified)", href: FILFOX_ADDRESS_URL[network](registry.address) },
+    ...(FILFOX_ADDRESS_URL[network]
+      ? [{ label: "Registry on Filfox (verified)", href: FILFOX_ADDRESS_URL[network](registry.address) }]
+      : []),
     ...(explorerUrl ? [{ label: "Registry on Blockscout", href: `${explorerUrl}/address/${registry.address}` }] : []),
     { label: "Source code", href: SOURCE_CODE_URL },
   ];

@@ -13,7 +13,7 @@ const ExplorerLink = ({ address, label = "address" }: ExplorerLinkProps) => {
   return (
     <CopyableText
       value={address}
-      to={`${explorerUrls[network]}/address/${address}`}
+      to={explorerUrls[network] ? `${explorerUrls[network]}/address/${address}` : undefined}
       external
       monospace={true}
       label={label}

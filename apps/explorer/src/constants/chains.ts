@@ -1,3 +1,4 @@
+import { toChain } from "@filoz/synapse-core/devnet";
 import { calibration as synapseCalibration, mainnet as synapseMainnet } from "@filoz/synapse-sdk";
 import type { Address } from "viem";
 import { arbitrum, avalanche, base, bsc, mainnet as ethereum, optimism, polygon } from "viem/chains";
@@ -112,6 +113,31 @@ export const calibration: Chain = {
   ],
 };
 
+/**
+ * A local foc-devnet, present only when the dev server was started with
+ * FOC_DEVNET=1 (see next.config.ts); undefined everywhere else.
+ */
+export const devnet: Chain | undefined = process.env.NEXT_PUBLIC_FOC_DEVNET_INFO
+  ? devnetChain(JSON.parse(process.env.NEXT_PUBLIC_FOC_DEVNET_INFO))
+  : undefined;
+
+function devnetChain(devnetInfo: Parameters<typeof toChain>[0]): Chain {
+  const chain = toChain(devnetInfo);
+  // A browser goes through the dev server's rewrite, because Lotus sends no CORS headers.
+  const rpc =
+    typeof window === "undefined" ? devnetInfo.info.lotus.host_rpc_url : `${window.location.origin}/api/devnet-rpc`;
+  return {
+    ...chain,
+    label: "Devnet",
+    slug: "devnet",
+    rpcUrls: { default: { http: [rpc] } },
+    // A devnet has no block explorer; toChain's placeholder would point at this app.
+    blockExplorers: undefined,
+    contracts: { ...chain.contracts, payments: chain.contracts.filecoinPay },
+    // Same shape at runtime; the types differ only because synapse-core is installed at two versions.
+  } as unknown as Chain;
+}
+
 export const SQUID_SOURCE_CHAINS = [
   mainnet,
   { ...arbitrum, name: "Arbitrum" },
@@ -133,6 +159,9 @@ export function getChain(network: Network = "calibration"): Chain {
       return mainnet;
     case "calibration":
       return calibration;
+    case "devnet":
+      if (devnet) return devnet;
+      throw new Error("Devnet is not enabled: start the dev server with FOC_DEVNET=1");
     default:
       throw new Error(`Chain with network ${network} not found`);
   }

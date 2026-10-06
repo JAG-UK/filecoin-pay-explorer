@@ -1,9 +1,10 @@
 import { createConfig } from "@privy-io/wagmi";
-import { calibration, mainnet, SQUID_SOURCE_CHAINS } from "@/constants/chains";
+import { calibration, devnet, mainnet, SQUID_SOURCE_CHAINS } from "@/constants/chains";
 import { createChainTransport } from "./transports";
 
-export const supportedChains = [mainnet, calibration] as const;
-const walletChains = [calibration, ...SQUID_SOURCE_CHAINS] as const;
+const devnetChains = devnet ? [devnet] : [];
+export const supportedChains = [mainnet, calibration, ...devnetChains] as const;
+const walletChains = [calibration, ...devnetChains, ...SQUID_SOURCE_CHAINS] as const;
 
 export const config = createConfig({
   chains: walletChains,
