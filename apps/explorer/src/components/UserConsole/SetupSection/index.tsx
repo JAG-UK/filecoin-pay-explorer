@@ -19,6 +19,7 @@ import {
   writeDepositBaseline,
 } from "./data/setupStatus";
 import { type AvailableFunds, FundsStep, useSetupFunds } from "./FundsStep";
+import { KeyspaceStep } from "./KeyspaceStep";
 import { SessionKeyStep, useKeyGrant } from "./SessionKeyStep";
 import { useWarmStorageApproval, WarmStorageStep } from "./WarmStorageStep";
 
@@ -31,6 +32,10 @@ const LINK_ERROR_COPY: Record<SetupLinkError, string> = {
   "bad-balance": "The balance it asks for cannot be read.",
   "bad-operator": "It names a service this page does not set up.",
   "bad-approval": "It asks for a kind of Warm Storage approval this page does not know.",
+  "bad-pubkey": "It asks to share a keyspace, but the session key's encryption key or its signature is missing.",
+  "bad-keyspace": "It asks to share a keyspace, but the keyspace id cannot be read.",
+  "bad-callback": "It asks to send a keyspace grant somewhere other than your own computer.",
+  "bad-role": "It asks to share a role whose name cannot be read.",
 };
 
 const NetworkName = ({ network }: { network: Network }) => <span className='capitalize'>{network}</span>;
@@ -135,6 +140,8 @@ function useDepositBaseline(network: Network, account: Hex, request: SetupReques
 
 const SetupSteps = ({ network, account, request }: { network: Network; account: Hex; request: SetupRequest }) => {
   const { grant, refetch: refetchGrant } = useKeyGrant(network, account, request.sessionKey);
+  // Nothing of a shared keyspace is on chain, so only this visit knows it was shared.
+  const [keyspaceShared, setKeyspaceShared] = useState(false);
   const approval = useWarmStorageApproval(network, account, request.unlimitedApproval);
   // An approval-only link never shows funds, so it reads none.
   const { funds, wallet: walletUsdfc } = useSetupFunds(network, account, !request.approvalOnly);
@@ -163,16 +170,18 @@ const SetupSteps = ({ network, account, request }: { network: Network; account: 
     if (funds.state === "ready" && liveMissing?.kind === "none") setFundsReached(true);
   }, [funds.state, liveMissing?.kind]);
   const missing: Shortfall | null = fundsReached ? { kind: "none" } : liveMissing;
-  const complete = isSetupComplete({
-    keyRequested: request.sessionKey !== null,
-    grant,
-    approved: approval.state === "approved",
-    // An unreadable balance never reads as "none", so this needs no separate readiness check.
-    fundsCovered: request.approvalOnly || missing?.kind === "none",
-  });
+  const complete =
+    (request.keyspace === null || keyspaceShared) &&
+    isSetupComplete({
+      keyRequested: request.sessionKey !== null,
+      grant,
+      approved: approval.state === "approved",
+      // An unreadable balance never reads as "none", so this needs no separate readiness check.
+      fundsCovered: request.approvalOnly || missing?.kind === "none",
+    });
   // The steps keep one order, whatever the reads say; only what each one offers changes.
   const offer = fundsOffer({ missing, walletUsdfc, approval: approval.state });
-  const first = request.sessionKey ? 2 : 1;
+  const first = (request.sessionKey ? 1 : 0) + (request.keyspace ? 1 : 0) + 1;
 
   return (
     <>
@@ -185,6 +194,18 @@ const SetupSteps = ({ network, account, request }: { network: Network; account: 
             request={request.sessionKey}
             grant={grant}
             onGranted={() => void refetchGrant()}
+          />
+        )}
+        {request.keyspace && (
+          <KeyspaceStep
+            number={request.sessionKey ? 2 : 1}
+            network={network}
+            account={account}
+            request={request.keyspace}
+            sessionKey={request.sessionKey?.address ?? null}
+            // The claim ends with the session key, so it waits for the key's authorization.
+            expires={grant.state === "authorized" ? grant.expiresAt : null}
+            onShared={() => setKeyspaceShared(true)}
           />
         )}
         <WarmStorageStep

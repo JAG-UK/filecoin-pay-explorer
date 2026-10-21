@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { publicKeyOf } from "@filoz/keysmith";
 import { getAddress } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { describe, it } from "vitest";
-import { legacySetupPath, parseSetupLink } from "./setupLink";
+import { keyAgreementMessage, legacySetupPath, parseSetupLink, verifyKeyAgreementKey } from "./setupLink";
 
 const LOWERCASE = "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266";
 const CHECKSUMMED = getAddress(LOWERCASE);
@@ -14,6 +16,7 @@ describe("parseSetupLink", () => {
     assert.deepEqual(link(""), {
       network: null,
       sessionKey: null,
+      keyspace: null,
       deposit: null,
       balance: null,
       approvalOnly: false,
@@ -22,6 +25,7 @@ describe("parseSetupLink", () => {
     assert.deepEqual(link("foo=bar"), {
       network: null,
       sessionKey: null,
+      keyspace: null,
       deposit: null,
       balance: null,
       approvalOnly: false,
@@ -33,6 +37,7 @@ describe("parseSetupLink", () => {
     assert.deepEqual(link("network=mainnet"), {
       network: "mainnet",
       sessionKey: null,
+      keyspace: null,
       deposit: null,
       balance: null,
       approvalOnly: false,
@@ -44,6 +49,7 @@ describe("parseSetupLink", () => {
     assert.deepEqual(keyLink(), {
       network: "calibration",
       sessionKey: { address: CHECKSUMMED, scopes: ["addPieces"], name: null, days: null },
+      keyspace: null,
       deposit: null,
       balance: null,
       approvalOnly: false,
@@ -55,6 +61,7 @@ describe("parseSetupLink", () => {
     assert.deepEqual(link(`signer=${LOWERCASE}&scopes=addPieces&network=mainnet`), {
       network: "mainnet",
       sessionKey: { address: CHECKSUMMED, scopes: ["addPieces"], name: null, days: null },
+      keyspace: null,
       deposit: null,
       balance: null,
       approvalOnly: false,
@@ -66,6 +73,7 @@ describe("parseSetupLink", () => {
     assert.deepEqual(link("deposit=2&operator=fwss&network=calibration"), {
       network: "calibration",
       sessionKey: null,
+      keyspace: null,
       deposit: "2",
       balance: null,
       approvalOnly: false,
@@ -74,6 +82,7 @@ describe("parseSetupLink", () => {
     assert.deepEqual(link("operator=FWSS&network=mainnet"), {
       network: "mainnet",
       sessionKey: null,
+      keyspace: null,
       deposit: null,
       balance: null,
       approvalOnly: true,
@@ -85,6 +94,7 @@ describe("parseSetupLink", () => {
     assert.deepEqual(keyLink("&deposit=1.5"), {
       network: "calibration",
       sessionKey: { address: CHECKSUMMED, scopes: ["addPieces"], name: null, days: null },
+      keyspace: null,
       deposit: "1.5",
       balance: null,
       approvalOnly: false,
@@ -164,6 +174,7 @@ describe("parseSetupLink", () => {
     assert.deepEqual(link("operator=fwss&network=mainnet&approval=unlimited"), {
       network: "mainnet",
       sessionKey: null,
+      keyspace: null,
       deposit: null,
       balance: null,
       approvalOnly: true,
@@ -172,6 +183,7 @@ describe("parseSetupLink", () => {
     assert.deepEqual(link("approval=Unlimited&network=calibration"), {
       network: "calibration",
       sessionKey: null,
+      keyspace: null,
       deposit: null,
       balance: null,
       approvalOnly: true,
@@ -240,5 +252,87 @@ describe("legacySetupPath", () => {
     assert.equal(path("/console", "network=mainnet"), null);
     assert.equal(path("/console/notifications", "deposit=2"), null);
     assert.equal(path("/console/setup", "deposit=2&network=mainnet"), null);
+  });
+});
+
+describe("parseSetupLink: keyspace grants", async () => {
+  // Anvil's first account: its address is LOWERCASE.
+  const SESSION_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+  const AGREEMENT_KEY = publicKeyOf(SESSION_KEY);
+  const SIGNATURE = await privateKeyToAccount(SESSION_KEY).signMessage({ message: keyAgreementMessage(AGREEMENT_KEY) });
+  const KEYSPACE = "0x00112233445566778899aabbccddeeff";
+  const keyspaceLink = (extra: string) => keyLink(`&pubkey=${AGREEMENT_KEY}&pubkeysig=${SIGNATURE}${extra}`);
+
+  it("reads a keyspace to share with the session key, and a loopback callback", () => {
+    const request = keyspaceLink(`&keyspace=${KEYSPACE}&callback=http%3A%2F%2F127.0.0.1%3A4123%2Fabc`);
+    assert.ok(!("error" in request));
+    assert.deepEqual(request.keyspace, {
+      publicKey: AGREEMENT_KEY,
+      signature: SIGNATURE,
+      keyspace: KEYSPACE,
+      role: null,
+      callback: "http://127.0.0.1:4123/abc",
+    });
+    const fresh = keyspaceLink("&keyspace=new");
+    assert.ok(!("error" in fresh));
+    assert.equal(fresh.keyspace?.keyspace, "new");
+    assert.equal(fresh.keyspace?.callback, null);
+  });
+
+  it("accepts the key-agreement key only when the session key signed it", async () => {
+    const request = keyspaceLink("&keyspace=new");
+    assert.ok(!("error" in request) && request.keyspace);
+    assert.equal(await verifyKeyAgreementKey(CHECKSUMMED, request.keyspace), true);
+    const forged = await privateKeyToAccount(`0x${"11".repeat(32)}`).signMessage({
+      message: keyAgreementMessage(AGREEMENT_KEY),
+    });
+    assert.equal(await verifyKeyAgreementKey(CHECKSUMMED, { ...request.keyspace, signature: forged }), false);
+    const swapped = publicKeyOf(`0x${"22".repeat(32)}`);
+    assert.equal(await verifyKeyAgreementKey(CHECKSUMMED, { ...request.keyspace, publicKey: swapped }), false);
+  });
+
+  it("refuses a missing or malformed key-agreement key or signature", () => {
+    assert.deepEqual(keyLink(`&pubkey=${AGREEMENT_KEY}&keyspace=new`), { error: "bad-pubkey" });
+    assert.deepEqual(keyLink(`&pubkeysig=${SIGNATURE}&keyspace=new`), { error: "bad-pubkey" });
+    assert.deepEqual(keyLink(`&pubkey=0x1234&pubkeysig=${SIGNATURE}&keyspace=new`), { error: "bad-pubkey" });
+    assert.deepEqual(link(`network=calibration&pubkey=${AGREEMENT_KEY}&pubkeysig=${SIGNATURE}&keyspace=new`), {
+      error: "bad-pubkey",
+    });
+  });
+
+  it("reads a role to share instead of the whole keyspace, in its canonical form", () => {
+    const request = keyspaceLink(`&keyspace=${KEYSPACE}&role=${encodeURIComponent("team/alice")}`);
+    assert.ok(!("error" in request));
+    assert.equal(request.keyspace?.role, "team/alice");
+    const whole = keyspaceLink(`&keyspace=${KEYSPACE}`);
+    assert.ok(!("error" in whole));
+    assert.equal(whole.keyspace?.role, null);
+  });
+
+  it("refuses an unreadable role, and reads a role in a new keyspace", () => {
+    for (const role of ["", "team//alice", " team", "team/"]) {
+      assert.deepEqual(keyspaceLink(`&keyspace=${KEYSPACE}&role=${encodeURIComponent(role)}`), { error: "bad-role" });
+    }
+    const fresh = keyspaceLink("&keyspace=new&role=team");
+    assert.ok(!("error" in fresh));
+    assert.equal(fresh.keyspace?.role, "team");
+  });
+
+  it("refuses an unreadable keyspace id", () => {
+    assert.deepEqual(keyspaceLink("&keyspace=0x1234"), { error: "bad-keyspace" });
+    assert.deepEqual(keyspaceLink(""), { error: "bad-keyspace" });
+  });
+
+  it("refuses a callback that would send the grant off this machine", () => {
+    for (const callback of [
+      "https://evil.example/x",
+      "http://192.168.1.2:80/x",
+      "http://user:pw@127.0.0.1:1/x",
+      "file:///x",
+    ]) {
+      assert.deepEqual(keyspaceLink(`&keyspace=new&callback=${encodeURIComponent(callback)}`), {
+        error: "bad-callback",
+      });
+    }
   });
 });
