@@ -1,5 +1,40 @@
 # Changelog
 
+## [1.4.0](https://github.com/JAG-UK/filecoin-pay-explorer/compare/v1.3.1...v1.4.0) (2026-11-05)
+
+
+### Features
+
+* **subgraph:** index account-operator relations ([#386](https://github.com/JAG-UK/filecoin-pay-explorer/issues/386)) ([343b31e](https://github.com/JAG-UK/filecoin-pay-explorer/commit/343b31e33e6bd508f2e154b0843771e46cde1dcb))
+* **subgraph:** index fwss datasets ([#482](https://github.com/JAG-UK/filecoin-pay-explorer/issues/482)) ([e8307fa](https://github.com/JAG-UK/filecoin-pay-explorer/commit/e8307fa47033c75cbc3812bd8ab0c36031747f6a))
+* **subgraph:** index rail rate periods ([5cecad1](https://github.com/JAG-UK/filecoin-pay-explorer/commit/5cecad114ca2c742f977740f810bc74bf2646a44))
+* **subgraph:** index rail rate periods ([8e2d2d6](https://github.com/JAG-UK/filecoin-pay-explorer/commit/8e2d2d67a0eb6759195206567b561c395ce64d09))
+
+
+### Bug Fixes
+
+* avoid loading rail rate queues ([#453](https://github.com/JAG-UK/filecoin-pay-explorer/issues/453)) ([ad53397](https://github.com/JAG-UK/filecoin-pay-explorer/commit/ad53397e9a27fe8343d52a00b5c20271f873a70b))
+* biome ([5090e64](https://github.com/JAG-UK/filecoin-pay-explorer/commit/5090e64a2bf100bdbb7aa9eb9ba9411c1fc7d7c7))
+* biome ([2424b96](https://github.com/JAG-UK/filecoin-pay-explorer/commit/2424b9642f49b000f6af3f257dd4910a35984c8b))
+* exclude subgraph dependencies ([#203](https://github.com/JAG-UK/filecoin-pay-explorer/issues/203)) ([84b8dc2](https://github.com/JAG-UK/filecoin-pay-explorer/commit/84b8dc2d30bec2a25c451dc58493363fbce615ea))
+* **metrics:** remove stale daily lockup data ([ae0e964](https://github.com/JAG-UK/filecoin-pay-explorer/commit/ae0e9645eda77d8b6c44c35bf2aa76cf061589b6))
+* null token in OperatorToken ([#202](https://github.com/JAG-UK/filecoin-pay-explorer/issues/202)) ([7cf0e0e](https://github.com/JAG-UK/filecoin-pay-explorer/commit/7cf0e0e1f28685373a3acf2291f74bfd5deebe1a))
+* **subgraph:** add anonymous to synced abi events ([#605](https://github.com/JAG-UK/filecoin-pay-explorer/issues/605)) ([a44de10](https://github.com/JAG-UK/filecoin-pay-explorer/commit/a44de10c9d5c48b17ba7e5e5ec60c91f2785caee))
+* **subgraph:** clamp terminated rate periods ([8e08c3a](https://github.com/JAG-UK/filecoin-pay-explorer/commit/8e08c3a5e0b7577773546192ec6663089f06eade))
+* **subgraph:** drop invalid metrics fields ([d13a7ae](https://github.com/JAG-UK/filecoin-pay-explorer/commit/d13a7ae53569cf40b64ba94d41eb3868274f8a9c))
+* **subgraph:** drop invalid metrics fields ([7f39d19](https://github.com/JAG-UK/filecoin-pay-explorer/commit/7f39d1931088c67c2f5ebaec449301dc174fd319))
+* **subgraph:** drop operator token allowances ([2dc5cc3](https://github.com/JAG-UK/filecoin-pay-explorer/commit/2dc5cc3aeb22bb82983779d7846ed1cc6f7659d7))
+* **subgraph:** drop operator token allowances ([794779f](https://github.com/JAG-UK/filecoin-pay-explorer/commit/794779f19823c84c0266c6f7da07e8100f347bc6))
+* **subgraph:** make rate changes order independent ([#364](https://github.com/JAG-UK/filecoin-pay-explorer/issues/364)) ([485c12f](https://github.com/JAG-UK/filecoin-pay-explorer/commit/485c12f795ad6c666db14bfa271e0d332606c2d3))
+* tolerate replayed rail rate events ([3012086](https://github.com/JAG-UK/filecoin-pay-explorer/commit/3012086ad2a306a17a958a7147ced6a845f4f8be))
+* tolerate replayed rail rate events ([8332f99](https://github.com/JAG-UK/filecoin-pay-explorer/commit/8332f9959ae0c3d511b2bf924fb1f2d53ad68a88))
+* track processed rail rate events ([496404e](https://github.com/JAG-UK/filecoin-pay-explorer/commit/496404eb891d42f80dcba11c50d10a536ff1cbb4))
+
+
+### Code Refactoring
+
+* refine linting rules across packages ([#243](https://github.com/JAG-UK/filecoin-pay-explorer/issues/243)) ([cc3401a](https://github.com/JAG-UK/filecoin-pay-explorer/commit/cc3401a0335236473c27ab1d7dba31ea37ca7dc5))
+
 ## [1.3.1](https://github.com/FilOzone/filecoin-pay-explorer/compare/v1.3.0...v1.3.1) (2026-10-23)
 
 
